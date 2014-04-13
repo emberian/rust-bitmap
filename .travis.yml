@@ -1,0 +1,16 @@
+env:
+  global:
+    - "RUST_PATH=$HOME/.rust/lib"
+    - secure: MNwmpnZcX2uigKGqJll7L2XmZ8u/gwRJyWtCoL1uy3H3lclU9b+62RiyScYjvZ/zN1eZo2fdKwNhTLJ2qP0VX20Vgvup7kqB2cEmF6RflcuTF+kUwjvVsnzoTYKoDFkI0pZtAVCyLnDIyyjKd2SrwrErntw77z4rxwbDd54YN9U=
+before_install:
+  - yes | sudo add-apt-repository ppa:hansjorg/rust
+  - sudo apt-get update
+install:
+  - sudo apt-get install rust-nightly
+script:
+  - echo $RUST_PATH
+  - rustc --test lib.rs
+  - ./bitmap
+  - rustdoc lib.rs
+after_script:
+  - curl http://www.rust-ci.org/artifacts/put?t=$RUSTCI_TOKEN | sh
