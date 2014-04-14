@@ -1,7 +1,7 @@
 env:
   global:
     - "RUST_PATH=$HOME/.rust/lib"
-    - secure: MNwmpnZcX2uigKGqJll7L2XmZ8u/gwRJyWtCoL1uy3H3lclU9b+62RiyScYjvZ/zN1eZo2fdKwNhTLJ2qP0VX20Vgvup7kqB2cEmF6RflcuTF+kUwjvVsnzoTYKoDFkI0pZtAVCyLnDIyyjKd2SrwrErntw77z4rxwbDd54YN9U=
+    - secure: kUkVjHO8FeeH0cNsQ5eLp7x7+Mt4xTrZmf0UiG4mqHPAokdZGJCZiInspy4W0FTOhZplXKpISGMAspYZM2mhVGdpQu1H+aNS4P2Ny+5C9si0JuQCEOXUxsrK68Qb8IIxEJYO5faeQaZ9HRoGtwwy+Ck9WH81So+HS08Cext1tWc=
 before_install:
   - yes | sudo add-apt-repository ppa:hansjorg/rust
   - sudo apt-get update
