@@ -1,12 +1,15 @@
 #![crate_id = "bitmap#1.0.0"]
 #![crate_type = "rlib"]
 #![crate_type = "dylib"]
+#![feature(macro_rules, phase)]
 
 //! See the `Bitmap` type.
 
+#[cfg(not(ndebug))]
+#[phase(link, syntax)] extern crate log;
+
 extern crate libc;
 
-use std;
 use std::num::CheckedDiv;
 
 /// A dense bitmap, intended to store small bitslices (<= width of uint).
