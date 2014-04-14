@@ -2,7 +2,7 @@
 
 name = "bitmap"
 version = "1.0.0"
-authors = ["Corey Richardson <corey@octayn.net>"
+authors = ["Corey Richardson <corey@octayn.net>"]
 
 [[lib]]
 
