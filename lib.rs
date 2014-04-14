@@ -54,6 +54,23 @@ impl Bitmap {
         }
     }
 
+    pub unsafe fn new_raw(entries: uint, width: uint, ptr: *mut u8) -> Option<Bitmap> {
+        if width > (std::mem::size_of::<uint>() * 8) {
+            None
+        } else {
+            entries.checked_mul(&width)
+            .and_then(|bits| bits.checked_add( &(8 - (bits % 8)) ))
+            .and_then(|rbits| rbits.checked_div(&8))
+            .and_then(|_| {
+                Some(Bitmap {
+                    entries: entries,
+                    width: width,
+                    data: ptr
+                })
+            })
+        }
+    }
+
     /// Get the `i`th bitslice, returning None on out-of-bounds
     pub fn get(&self, i: uint) -> Option<uint> {
         if i >= self.entries {
