@@ -5,7 +5,6 @@
 
 //! See the `Bitmap` type.
 
-#[cfg(not(ndebug))]
 #[phase(link, syntax)] extern crate log;
 
 extern crate libc;
