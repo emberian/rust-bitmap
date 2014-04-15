@@ -172,6 +172,20 @@ impl Bitmap {
             true
         }
     }
+
+    pub fn len(&self) -> uint {
+        self.entries
+    }
+
+    pub fn byte_len(&self) -> uint {
+        let w = (self.entries * self.width);
+        let r = w % 8;
+        (w + r) / 8
+    }
+
+    pub unsafe fn get_ptr(&self) -> *mut u8 {
+        self.data
+    }
 }
 
 #[cfg(test)]
