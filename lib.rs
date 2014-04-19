@@ -199,6 +199,10 @@ impl Bitmap {
         (w + r) / 8
     }
 
+    pub fn iter<'a>(&'a self) -> Slices<'a> {
+        Slices { idx: 0, bm: self }
+    }
+
     /// Get the raw pointer to this Bitmap's data.
     pub unsafe fn get_ptr(&self) -> *mut u8 {
         self.data
@@ -215,13 +219,47 @@ impl Bitmap {
     }
 }
 
+/// Iterator over the bitslices in the bitmap
+pub struct Slices<'a> {
+    idx: uint,
+    bm: &'a Bitmap
+}
+
+impl<'a> Iterator<uint> for Slices<'a> {
+    /// *NOTE*: This iterator is not "well-behaved", in that if you keep calling
+    /// `next` after it returns None, eventually it will overflow and start
+    /// yielding elements again. Use the `fuse` method to make this
+    /// "well-behaved".
+    fn next(&mut self) -> Option<uint> {
+        let rv = self.bm.get(self.idx);
+        self.idx += 1;
+        rv
+    }
+
+    fn size_hint(&self) -> (uint, Option<uint>) {
+        (self.bm.len(), Some(self.bm.len()))
+    }
+}
+
+// The docs for RAI recommend that it's either an infinite iterator or a
+// DoubleEndedIterator. This is neither.
+impl<'a> std::iter::RandomAccessIterator<uint> for Slices<'a> {
+    fn indexable(&self) -> uint {
+        self.bm.len()
+    }
+
+    fn idx(&self, index: uint) -> Option<uint> {
+        self.bm.get(index)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::{get_n_bits_at, Bitmap};
     use std;
 
     #[test]
-    fn bitmap_empty() {
+    fn empty() {
         let bm = Bitmap::new(10, 10).unwrap();
 
         for i in range(0u, 10) {
@@ -233,7 +271,7 @@ mod test {
     }
 
     #[test]
-    fn bitmap_get() {
+    fn get() {
         let mut data: [u8, ..4] = [0b000_001_01, 0b0_011_100_1, 0b01_110_111, 0];
         let bm = Bitmap {
             entries: 8,
@@ -255,7 +293,7 @@ mod test {
     }
 
     #[test]
-    fn bitmap_set() {
+    fn set() {
         let mut bm = Bitmap::new(10, 3).unwrap();
 
         for i in range(0u, 8) {
@@ -293,5 +331,16 @@ mod test {
             0b11010101, 3, 1, 0b101;
             0b11010101, 3, 2, 0b010;
         }
+    }
+
+    #[test]
+    fn iter() {
+        let mut bm = Bitmap::new(10, 3).unwrap();
+
+        bm.set(2, 0b101);
+        bm.set(7, 0b110);
+
+        let bs: Vec<uint> = bm.iter().collect();
+        assert_eq!(bs.as_slice(), &[0, 0, 0b101, 0, 0, 0, 0, 0b110, 0, 0]);
     }
 }
