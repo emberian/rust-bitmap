@@ -12,6 +12,7 @@ extern crate libc;
 use std::num::CheckedDiv;
 
 /// A dense bitmap, intended to store small bitslices (<= width of uint).
+#[unsafe_no_drop_flag]
 pub struct Bitmap {
     entries: uint,
     width: uint,
@@ -22,6 +23,16 @@ pub struct Bitmap {
 
 fn get_n_bits_at(byte: u8, n: u8, start: u8) -> u8 {
     (byte >> (8-n-start)) & (0xFF >> (8-n))
+}
+
+impl Drop for Bitmap {
+    fn drop(&mut self) {
+        let p = self.data;
+        if p != std::ptr::mut_null() {
+            self.data = std::ptr::mut_null();
+            unsafe { libc::free(p as *mut libc::c_void); }
+        }
+    }
 }
 
 impl Bitmap {
@@ -54,6 +65,9 @@ impl Bitmap {
         }
     }
 
+    /// Create a new Bitmap from raw parts. Will return None if the given
+    /// entry and width would overflow the number of bits or bytes needed to
+    /// store the Bitmap.
     pub unsafe fn new_raw(entries: uint, width: uint, ptr: *mut u8) -> Option<Bitmap> {
         if width > (std::mem::size_of::<uint>() * 8) {
             None
@@ -173,24 +187,38 @@ impl Bitmap {
         }
     }
 
+    /// Length in number of bitslices cointained.
     pub fn len(&self) -> uint {
         self.entries
     }
 
+    /// Size of the internal buffer, in bytes.
     pub fn byte_len(&self) -> uint {
-        let w = (self.entries * self.width);
+        let w = self.entries * self.width;
         let r = w % 8;
         (w + r) / 8
     }
 
+    /// Get the raw pointer to this Bitmap's data.
     pub unsafe fn get_ptr(&self) -> *mut u8 {
         self.data
+    }
+
+    /// Set the raw pointer to this Bitmap's data, returning the old one. It
+    /// needs to be free'd with `libc::free` if the Bitmap was not made with
+    /// `new_raw`. In general this operation should really be avoided. The
+    /// destructor will call `libc::free` on the internal pointer.
+    pub unsafe fn set_ptr(&mut self, ptr: *mut u8) -> *mut u8 {
+        let p = self.data;
+        self.data = ptr;
+        p
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::{get_n_bits_at, Bitmap};
+    use std;
 
     #[test]
     fn bitmap_empty() {
@@ -220,6 +248,10 @@ mod test {
 
         assert_eq!(bm.get(8), None);
         assert_eq!(bm.get(9), None);
+
+        // we don't use real data here, so don't bother freeing it
+        let mut bm = bm;
+        unsafe { bm.set_ptr(std::ptr::mut_null()); }
     }
 
     #[test]
