@@ -9,8 +9,8 @@ install:
   - sudo apt-get install rust-nightly
 script:
   - echo $RUST_PATH
-  - rustc --test lib.rs
+  - rustc --test src/bitmap.rs
   - ./bitmap
-  - rustdoc lib.rs
+  - rustdoc src/bitmap.rs
 after_script:
   - curl http://www.rust-ci.org/artifacts/put?t=$RUSTCI_TOKEN | sh
