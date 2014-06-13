@@ -5,7 +5,7 @@
 
 //! See the `Bitmap` type.
 
-#[phase(link, syntax)] extern crate log;
+#[phase(link, plugin)] extern crate log;
 
 extern crate libc;
 
@@ -248,7 +248,7 @@ impl<'a> std::iter::RandomAccessIterator<uint> for Slices<'a> {
         self.bm.len()
     }
 
-    fn idx(&self, index: uint) -> Option<uint> {
+    fn idx(&mut self, index: uint) -> Option<uint> {
         self.bm.get(index)
     }
 }
