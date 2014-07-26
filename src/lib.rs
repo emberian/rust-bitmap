@@ -1,6 +1,3 @@
-#![crate_id = "bitmap#1.0.0"]
-#![crate_type = "rlib"]
-#![crate_type = "dylib"]
 #![feature(macro_rules, phase)]
 
 //! See the `Bitmap` type.
@@ -22,7 +19,7 @@ pub struct Bitmap {
 }
 
 fn get_n_bits_at(byte: u8, n: u8, start: u8) -> u8 {
-    (byte >> (8-n-start)) & (0xFF >> (8-n))
+    (byte >> (8-n-start) as uint) & (0xFF >> (8-n) as uint)
 }
 
 impl Drop for Bitmap {

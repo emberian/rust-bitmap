@@ -1,5 +1,3 @@
 doc/
-*.rlib
-*.so
+target/
 *.swp
-*.a
