@@ -2,10 +2,11 @@ env:
   global:
     - "RUST_PATH=$HOME/.rust/lib"
     - secure: gYSHyOLWheK2zRVD/JOuq+5BHVEA0BZnynxMkiPeKrhHeeslLQZj+SpkdN0ek2N6Kl1ouennTaHVGZtaUdfW1IqSoT8OR+4fayGMqr3NX0qjGDRTlVJz8YX/j1TI6ZsM7135WEqiT7xLLBdcv/SY12BtHf1qP7vEpCRcjxlOW4M=
-install:
-  - curl http://www.rust-lang.org/rustup.sh | sudo sh
+language: rust
 script:
+  - cargo build
   - cargo test
-  - rustdoc src/lib.rs
+  - cargo doc
 after_script:
+  - mv target/doc .
   - curl http://www.rust-ci.org/artifacts/put?t=$RUSTCI_TOKEN | sh
