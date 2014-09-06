@@ -100,20 +100,13 @@ impl Bitmap {
                 // how many bits can we need to set in this byte?
                 let can_get = std::cmp::min(8 - in_byte_offset, bits_left);
 
-                debug!("can_get = {}, bit_offset = {}, in_byte_offset = {}, byte_offset = {}, bits_left = {}",
-                        can_get, bit_offset, in_byte_offset, byte_offset, bits_left);
-
                 // alright, pull them out.
                 let byte = unsafe { *self.data.offset(byte_offset as int) };
-                debug!("byte is {:t}", byte);
                 let got = get_n_bits_at(byte, can_get as u8, in_byte_offset as u8) as uint;
-                debug!("got {:t}", got);
 
                 // make room for the bits we just read
                 value <<= can_get;
                 value |= got;
-
-                debug!("value is now {:t}", value);
 
                 // update all the state
                 bit_offset += can_get;
@@ -133,9 +126,7 @@ impl Bitmap {
             false
         } else {
             // shift over into the high bits
-            debug!("value is {:t}", value);
             value <<= uintbits - self.width;
-            debug!("we shifted it into {:t}", value);
 
             let mut bit_offset = i * self.width;
 
@@ -147,29 +138,20 @@ impl Bitmap {
             while bits_left > 0 {
                 let can_set = std::cmp::min(8 - in_byte_offset, bits_left);
 
-                debug!("can_set = {}, bit_offset = {}, in_byte_offset = {}, byte_offset = {}, bits_left = {}",
-                        can_set, bit_offset, in_byte_offset, byte_offset, bits_left);
-
                 // pull out the highest can_set bits from value
                 let mut to_set: uint = value >> (uintbits - can_set);
-                debug!("to_set is {:t}", to_set);
                 // move them into where they will live
                 to_set <<= 8 - can_set - in_byte_offset;
-                debug!("and now it's {:t}", to_set);
 
                 let addr = unsafe { self.data.offset(byte_offset as int) };
                 let mut byte = unsafe { *addr };
 
-                debug!("found byte {:t}", byte);
                 // clear the bits we'll be setting
                 byte &= !(0xFF >> (8 - in_byte_offset) << (8 - in_byte_offset - self.width));
-                debug!("cleared some bits to get {:t}", byte);
 
-                assert!(to_set <= 255, "oh no! {:t} doesn't fit in a byte :(", to_set);
+                debug_assert!(to_set <= 255);
 
                 byte |= to_set as u8;
-
-                debug!("all done, storing {:t}", byte);
 
                 unsafe { *addr = byte };
 
@@ -260,7 +242,6 @@ mod test {
         let bm = Bitmap::new(10, 10).unwrap();
 
         for i in range(0u, 10) {
-            debug!("i is {}", i);
             assert_eq!(bm.get(i), Some(0));
         }
 
@@ -277,7 +258,6 @@ mod test {
         };
 
         for i in range(0u, 8) {
-            debug!("i is {}", i);
             assert_eq!(bm.get(i), Some(i));
         }
 
@@ -294,7 +274,6 @@ mod test {
         let mut bm = Bitmap::new(10, 3).unwrap();
 
         for i in range(0u, 8) {
-            debug!("i is {}", i);
             assert!(bm.set(i, i));
             assert_eq!(bm.get(i), Some(i));
         }
@@ -338,6 +317,6 @@ mod test {
         bm.set(7, 0b110);
 
         let bs: Vec<uint> = bm.iter().collect();
-        assert_eq!(bs.as_slice(), &[0, 0, 0b101, 0, 0, 0, 0, 0b110, 0, 0]);
+        assert_eq!(bs.as_slice(), [0, 0, 0b101, 0, 0, 0, 0, 0b110, 0, 0].as_slice());
     }
 }
