@@ -25,8 +25,8 @@ fn get_n_bits_at(byte: u8, n: u8, start: u8) -> u8 {
 impl Drop for Bitmap {
     fn drop(&mut self) {
         let p = self.data;
-        if p != std::ptr::mut_null() {
-            self.data = std::ptr::mut_null();
+        if p != std::ptr::null_mut() {
+            self.data = std::ptr::null_mut();
             unsafe { libc::free(p as *mut libc::c_void); }
         }
     }
@@ -48,7 +48,7 @@ impl Bitmap {
                 // more resilient to failure.
                 let ptr = unsafe { libc::malloc(needed as u64) };
 
-                if ptr == std::ptr::mut_null() {
+                if ptr == std::ptr::null_mut() {
                     None
                 } else {
                     unsafe { std::ptr::zero_memory(ptr, needed); }
@@ -266,7 +266,7 @@ mod test {
 
         // we don't use real data here, so don't bother freeing it
         let mut bm = bm;
-        unsafe { bm.set_ptr(std::ptr::mut_null()); }
+        unsafe { bm.set_ptr(std::ptr::null_mut()); }
     }
 
     #[test]
