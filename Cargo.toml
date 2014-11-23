@@ -9,4 +9,4 @@ repository = "https://github.com/cmr/rust-bitmap"
 homepage = "https://github.com/cmr/rust-bitmap"
 
 readme = "README.rst"
-license = "ASL2/MIT"
+license = "Apache-2.0/MIT"
