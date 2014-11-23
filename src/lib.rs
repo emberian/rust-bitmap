@@ -6,7 +6,7 @@
 
 extern crate libc;
 
-use std::num::CheckedDiv;
+use std::num::Int;
 
 /// A dense bitmap, intended to store small bitslices (<= width of uint).
 #[unsafe_no_drop_flag]
@@ -40,9 +40,9 @@ impl Bitmap {
         if width > (std::mem::size_of::<uint>() * 8) {
             None
         } else {
-            entries.checked_mul(&width)
-            .and_then(|bits| bits.checked_add( &(8 - (bits % 8)) ))
-            .and_then(|rbits| rbits.checked_div(&8))
+            entries.checked_mul(width)
+            .and_then(|bits| bits.checked_add(8 - (bits % 8)))
+            .and_then(|rbits| rbits.checked_div(8))
             .and_then(|needed| {
                 // can't use ~ or ~[] because they fail on failure to allocate. this needs to be
                 // more resilient to failure.
@@ -69,9 +69,9 @@ impl Bitmap {
         if width > (std::mem::size_of::<uint>() * 8) {
             None
         } else {
-            entries.checked_mul(&width)
-            .and_then(|bits| bits.checked_add( &(8 - (bits % 8)) ))
-            .and_then(|rbits| rbits.checked_div(&8))
+            entries.checked_mul(width)
+            .and_then(|bits| bits.checked_add(8 - (bits % 8)))
+            .and_then(|rbits| rbits.checked_div(8))
             .and_then(|_| {
                 Some(Bitmap {
                     entries: entries,
