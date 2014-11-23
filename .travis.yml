@@ -1,8 +1,7 @@
+language: rust
 env:
   global:
-    - "RUST_PATH=$HOME/.rust/lib"
-    - secure: gYSHyOLWheK2zRVD/JOuq+5BHVEA0BZnynxMkiPeKrhHeeslLQZj+SpkdN0ek2N6Kl1ouennTaHVGZtaUdfW1IqSoT8OR+4fayGMqr3NX0qjGDRTlVJz8YX/j1TI6ZsM7135WEqiT7xLLBdcv/SY12BtHf1qP7vEpCRcjxlOW4M=
-language: rust
+    - secure: j5NS820mY4CwAa6Lu9Pub9fM4XEbzQCVeQeFyvPSNrAjhVDXYZnnKGV0AjhtcLUbNWdWyz6vK6xptLdozbcEvabA5mXqERkkiwdm2AHzFsqoBHvuj1TemKjuCZZkXA3qsAZUqMBy03C85kIKPsPldDTqQ6IpSXRoFQkhvGeT/Ho=
 script:
   - cargo build
   - cargo test

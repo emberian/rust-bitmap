@@ -3,3 +3,10 @@
 name = "bitmap"
 version = "1.0.1"
 authors = ["Corey Richardson <corey@octayn.net>"]
+
+description = "A dense bitmap"
+repository = "https://github.com/cmr/rust-bitmap"
+homepage = "https://github.com/cmr/rust-bitmap"
+
+readme = "README.rst"
+license = "ASL2/MIT"
