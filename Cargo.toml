@@ -10,3 +10,7 @@ homepage = "https://github.com/cmr/rust-bitmap"
 
 readme = "README.rst"
 license = "Apache-2.0/MIT"
+
+[dependencies]
+log = "*"
+libc = "*"

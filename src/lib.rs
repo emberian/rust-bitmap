@@ -1,52 +1,49 @@
-#![feature(macro_rules, phase)]
-
 //! See the `Bitmap` type.
 
-#[phase(link, plugin)] extern crate log;
-
-extern crate libc;
+#[macro_use] extern crate log;
 
 use std::num::Int;
+use std::rt::heap;
 
-/// A dense bitmap, intended to store small bitslices (<= width of uint).
+/// A dense bitmap, intended to store small bitslices (<= width of usize).
 #[unsafe_no_drop_flag]
 pub struct Bitmap {
-    entries: uint,
-    width: uint,
-    // we avoid a vector here because we have our own bounds checking, and
-    // don't need to duplicate the length.
+    entries: usize,
+    width: usize,
+    // Avoid a vector here because we have our own bounds checking, and
+    // don't want to duplicate the length, or panic.
     data: *mut u8,
 }
 
 fn get_n_bits_at(byte: u8, n: u8, start: u8) -> u8 {
-    (byte >> (8-n-start) as uint) & (0xFF >> (8-n) as uint)
+    (byte >> (8-n-start) as usize) & (0xFF >> (8-n) as usize)
 }
 
 impl Drop for Bitmap {
     fn drop(&mut self) {
         let p = self.data;
-        if p != std::ptr::null_mut() {
-            self.data = std::ptr::null_mut();
-            unsafe { libc::free(p as *mut libc::c_void); }
+        if p != 0 as *mut _ {
+            self.data = 0 as *mut _;
+            unsafe { heap::deallocate(p as *mut u8, self.byte_len(), std::mem::align_of::<u8>()) }
         }
     }
 }
 
 impl Bitmap {
     /// Create a new bitmap, returning None if the data can't be allocated or
-    /// if the width of each slice can't fit in a uint. entries * width must
-    /// not overflow uint.
-    pub fn new(entries: uint, width: uint) -> Option<Bitmap> {
-        if width > (std::mem::size_of::<uint>() * 8) {
+    /// if the width of each slice can't fit in a usize. entries * width must
+    /// not overflow usize.
+    pub fn new(entries: usize, width: usize) -> Option<Bitmap> {
+        if width > (std::mem::size_of::<usize>() * 8) {
             None
         } else {
             entries.checked_mul(width)
             .and_then(|bits| bits.checked_add(8 - (bits % 8)))
             .and_then(|rbits| rbits.checked_div(8))
             .and_then(|needed| {
-                // can't use ~ or ~[] because they fail on failure to allocate. this needs to be
+                // can't use Box or Vec because they panic on failure to allocate. this needs to be
                 // more resilient to failure.
-                let ptr = unsafe { libc::malloc(needed as u64) };
+                let ptr = unsafe { heap::allocate(needed, std::mem::align_of::<u8>()) };
 
                 if ptr == std::ptr::null_mut() {
                     None
@@ -65,8 +62,8 @@ impl Bitmap {
     /// Create a new Bitmap from raw parts. Will return None if the given
     /// entry and width would overflow the number of bits or bytes needed to
     /// store the Bitmap.
-    pub unsafe fn new_raw(entries: uint, width: uint, ptr: *mut u8) -> Option<Bitmap> {
-        if width > (std::mem::size_of::<uint>() * 8) {
+    pub unsafe fn new_raw(entries: usize, width: usize, ptr: *mut u8) -> Option<Bitmap> {
+        if width > (std::mem::size_of::<usize>() * 8) {
             None
         } else {
             entries.checked_mul(width)
@@ -83,7 +80,7 @@ impl Bitmap {
     }
 
     /// Get the `i`th bitslice, returning None on out-of-bounds
-    pub fn get(&self, i: uint) -> Option<uint> {
+    pub fn get(&self, i: usize) -> Option<usize> {
         if i >= self.entries {
             None
         } else {
@@ -94,15 +91,15 @@ impl Bitmap {
 
             let mut bits_left = self.width;
 
-            let mut value: uint = 0;
+            let mut value: usize = 0;
 
             while bits_left > 0 {
                 // how many bits can we need to set in this byte?
                 let can_get = std::cmp::min(8 - in_byte_offset, bits_left);
 
                 // alright, pull them out.
-                let byte = unsafe { *self.data.offset(byte_offset as int) };
-                let got = get_n_bits_at(byte, can_get as u8, in_byte_offset as u8) as uint;
+                let byte = unsafe { *self.data.offset(byte_offset as isize) };
+                let got = get_n_bits_at(byte, can_get as u8, in_byte_offset as u8) as usize;
 
                 // make room for the bits we just read
                 value <<= can_get;
@@ -120,13 +117,13 @@ impl Bitmap {
 
     /// Set the `i`th bitslice to `value`, returning false on out-of-bounds or if `value` contains
     /// bits outside of the least significant `self.width` bits.
-    pub fn set(&mut self, i: uint, mut value: uint) -> bool {
-        let uintbits = std::mem::size_of::<uint>() * 8;
-        if i >= self.entries || value & !(-1 >> (uintbits - self.width)) != 0 {
+    pub fn set(&mut self, i: usize, mut value: usize) -> bool {
+        let usize = std::mem::size_of::<usize>() * 8;
+        if i >= self.entries || value & !(-1 >> (usize - self.width)) != 0 {
             false
         } else {
             // shift over into the high bits
-            value <<= uintbits - self.width;
+            value <<= usize - self.width;
 
             let mut bit_offset = i * self.width;
 
@@ -139,11 +136,11 @@ impl Bitmap {
                 let can_set = std::cmp::min(8 - in_byte_offset, bits_left);
 
                 // pull out the highest can_set bits from value
-                let mut to_set: uint = value >> (uintbits - can_set);
+                let mut to_set: usize = value >> (usize - can_set);
                 // move them into where they will live
                 to_set <<= 8 - can_set - in_byte_offset;
 
-                let addr = unsafe { self.data.offset(byte_offset as int) };
+                let addr = unsafe { self.data.offset(byte_offset as isize) };
                 let mut byte = unsafe { *addr };
 
                 // clear the bits we'll be setting
@@ -167,12 +164,13 @@ impl Bitmap {
     }
 
     /// Length in number of bitslices cointained.
-    pub fn len(&self) -> uint {
+    pub fn len(&self) -> usize {
         self.entries
     }
 
     /// Size of the internal buffer, in bytes.
-    pub fn byte_len(&self) -> uint {
+    pub fn byte_len(&self) -> usize {
+        // can't overflow, since creation asserts that it doesn't.
         let w = self.entries * self.width;
         let r = w % 8;
         (w + r) / 8
@@ -200,34 +198,35 @@ impl Bitmap {
 
 /// Iterator over the bitslices in the bitmap
 pub struct Slices<'a> {
-    idx: uint,
+    idx: usize,
     bm: &'a Bitmap
 }
 
-impl<'a> Iterator<uint> for Slices<'a> {
+impl<'a> Iterator for Slices<'a> {
+    type Item = usize;
     /// *NOTE*: This iterator is not "well-behaved", in that if you keep calling
     /// `next` after it returns None, eventually it will overflow and start
     /// yielding elements again. Use the `fuse` method to make this
     /// "well-behaved".
-    fn next(&mut self) -> Option<uint> {
+    fn next(&mut self) -> Option<usize> {
         let rv = self.bm.get(self.idx);
         self.idx += 1;
         rv
     }
 
-    fn size_hint(&self) -> (uint, Option<uint>) {
+    fn size_hint(&self) -> (usize, Option<usize>) {
         (self.bm.len(), Some(self.bm.len()))
     }
 }
 
 // The docs for RAI recommend that it's either an infinite iterator or a
 // DoubleEndedIterator. This is neither.
-impl<'a> std::iter::RandomAccessIterator<uint> for Slices<'a> {
-    fn indexable(&self) -> uint {
+impl<'a> std::iter::RandomAccessIterator for Slices<'a> {
+    fn indexable(&self) -> usize {
         self.bm.len()
     }
 
-    fn idx(&mut self, index: uint) -> Option<uint> {
+    fn idx(&mut self, index: usize) -> Option<usize> {
         self.bm.get(index)
     }
 }
@@ -241,7 +240,7 @@ mod test {
     fn empty() {
         let bm = Bitmap::new(10, 10).unwrap();
 
-        for i in range(0u, 10) {
+        for i in range(0, 10) {
             assert_eq!(bm.get(i), Some(0));
         }
 
@@ -250,14 +249,14 @@ mod test {
 
     #[test]
     fn get() {
-        let mut data: [u8, ..4] = [0b000_001_01, 0b0_011_100_1, 0b01_110_111, 0];
+        let mut data: [u8; 4] = [0b000_001_01, 0b0_011_100_1, 0b01_110_111, 0];
         let bm = Bitmap {
             entries: 8,
             width: 3,
-            data: &mut data as *mut [u8, ..4] as *mut u8
+            data: &mut data as *mut [u8; 4] as *mut u8
         };
 
-        for i in range(0u, 8) {
+        for i in range(0, 8) {
             assert_eq!(bm.get(i), Some(i));
         }
 
@@ -273,7 +272,7 @@ mod test {
     fn set() {
         let mut bm = Bitmap::new(10, 3).unwrap();
 
-        for i in range(0u, 8) {
+        for i in range(0, 8) {
             assert!(bm.set(i, i));
             assert_eq!(bm.get(i), Some(i));
         }
@@ -316,7 +315,7 @@ mod test {
         bm.set(2, 0b101);
         bm.set(7, 0b110);
 
-        let bs: Vec<uint> = bm.iter().collect();
+        let bs: Vec<usize> = bm.iter().collect();
         assert_eq!(bs.as_slice(), [0, 0, 0b101, 0, 0, 0, 0, 0b110, 0, 0].as_slice());
     }
 }
