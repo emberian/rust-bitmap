@@ -1,12 +1,6 @@
 //! See the `Bitmap` type.
 
-#[macro_use] extern crate log;
-
-use std::num::Int;
-use std::rt::heap;
-
 /// A dense bitmap, intended to store small bitslices (<= width of usize).
-#[unsafe_no_drop_flag]
 pub struct Bitmap {
     entries: usize,
     width: usize,
@@ -15,6 +9,7 @@ pub struct Bitmap {
     data: *mut u8,
 }
 
+#[inline(always)]
 fn get_n_bits_at(byte: u8, n: u8, start: u8) -> u8 {
     (byte >> (8-n-start) as usize) & (0xFF >> (8-n) as usize)
 }
@@ -24,7 +19,7 @@ impl Drop for Bitmap {
         let p = self.data;
         if p != 0 as *mut _ {
             self.data = 0 as *mut _;
-            unsafe { heap::deallocate(p as *mut u8, self.byte_len(), std::mem::align_of::<u8>()) }
+            let _ = unsafe { Vec::from_raw_parts(p as *mut u8, 0, self.byte_len()) };
         }
     }
 }
@@ -34,27 +29,26 @@ impl Bitmap {
     /// if the width of each slice can't fit in a usize. entries * width must
     /// not overflow usize.
     pub fn new(entries: usize, width: usize) -> Option<Bitmap> {
-        if width > (std::mem::size_of::<usize>() * 8) {
+        if width > (std::mem::size_of::<usize>() * 8) || width == 0 {
             None
         } else {
             entries.checked_mul(width)
             .and_then(|bits| bits.checked_add(8 - (bits % 8)))
             .and_then(|rbits| rbits.checked_div(8))
             .and_then(|needed| {
-                // can't use Box or Vec because they panic on failure to allocate. this needs to be
-                // more resilient to failure.
-                let ptr = unsafe { heap::allocate(needed, std::mem::align_of::<u8>()) };
+                let ptr = unsafe {
+                    let mut alloc = Vec::<u8>::with_capacity(needed);
+                    let ptr = alloc.as_mut_ptr();
+                    std::mem::forget(alloc);
+                    ptr
+                };
 
-                if ptr == std::ptr::null_mut() {
-                    None
-                } else {
-                    unsafe { std::ptr::zero_memory(ptr, needed); }
-                    Some(Bitmap {
-                        entries: entries,
-                        width: width,
-                        data: ptr as *mut u8
-                    })
-                }
+                unsafe { std::ptr::write_bytes(ptr, 0, needed); }
+                Some(Bitmap {
+                    entries: entries,
+                    width: width,
+                    data: ptr as *mut u8
+                })
             })
         }
     }
@@ -62,8 +56,8 @@ impl Bitmap {
     /// Create a new Bitmap from raw parts. Will return None if the given
     /// entry and width would overflow the number of bits or bytes needed to
     /// store the Bitmap.
-    pub unsafe fn new_raw(entries: usize, width: usize, ptr: *mut u8) -> Option<Bitmap> {
-        if width > (std::mem::size_of::<usize>() * 8) {
+    pub unsafe fn from_raw_parts(entries: usize, width: usize, ptr: *mut u8) -> Option<Bitmap> {
+        if width > (std::mem::size_of::<usize>() * 8) || width == 0 {
             None
         } else {
             entries.checked_mul(width)
@@ -119,11 +113,11 @@ impl Bitmap {
     /// bits outside of the least significant `self.width` bits.
     pub fn set(&mut self, i: usize, mut value: usize) -> bool {
         let usize = std::mem::size_of::<usize>() * 8;
-        if i >= self.entries || value & !(-1 >> (usize - self.width)) != 0 {
+        if i >= self.entries || value & !(usize::max_value() >> (std::cmp::min(usize-1, usize - self.width))) != 0 {
             false
         } else {
             // shift over into the high bits
-            value <<= usize - self.width;
+            value <<= std::cmp::min(usize - 1, usize - self.width);
 
             let mut bit_offset = i * self.width;
 
@@ -143,10 +137,14 @@ impl Bitmap {
                 let addr = unsafe { self.data.offset(byte_offset as isize) };
                 let mut byte = unsafe { *addr };
 
-                // clear the bits we'll be setting
-                byte &= !(0xFF >> (8 - in_byte_offset) << (8 - in_byte_offset - self.width));
-
                 debug_assert!(to_set <= 255);
+
+                // clear the bits we'll be setting
+                byte &= !(0xFF
+                          >>
+                          (7 - in_byte_offset)
+                          <<
+                          (8usize.saturating_sub(in_byte_offset).saturating_sub(self.width)));
 
                 byte |= to_set as u8;
 
@@ -176,7 +174,7 @@ impl Bitmap {
         (w + r) / 8
     }
 
-    pub fn iter<'a>(&'a self) -> Slices<'a> {
+    pub fn iter(&self) -> Slices {
         Slices { idx: 0, bm: self }
     }
 
@@ -185,10 +183,10 @@ impl Bitmap {
         self.data
     }
 
-    /// Set the raw pointer to this Bitmap's data, returning the old one. It
-    /// needs to be free'd with `libc::free` if the Bitmap was not made with
-    /// `new_raw`. In general this operation should really be avoided. The
-    /// destructor will call `libc::free` on the internal pointer.
+    /// Set the raw pointer to this Bitmap's data, returning the old one. It needs to be free'd
+    /// with `Vec`'s destructor if the Bitmap was not made with `from_raw_parts`. In general this
+    /// operation should really be avoided. The destructor will call `Vec`s destructor on the
+    /// internal pointer.
     pub unsafe fn set_ptr(&mut self, ptr: *mut u8) -> *mut u8 {
         let p = self.data;
         self.data = ptr;
@@ -219,20 +217,20 @@ impl<'a> Iterator for Slices<'a> {
     }
 }
 
-// The docs for RAI recommend that it's either an infinite iterator or a
-// DoubleEndedIterator. This is neither.
-impl<'a> std::iter::RandomAccessIterator for Slices<'a> {
-    fn indexable(&self) -> usize {
-        self.bm.len()
-    }
+impl<'a> std::iter::IntoIterator for &'a Bitmap {
+    type Item = usize;
+    type IntoIter = Slices<'a>;
 
-    fn idx(&mut self, index: usize) -> Option<usize> {
-        self.bm.get(index)
+    fn into_iter(self) -> Slices<'a> {
+        self.iter()
     }
 }
 
 #[cfg(test)]
 mod test {
+    extern crate quickcheck;
+
+    use self::quickcheck::quickcheck;
     use super::{get_n_bits_at, Bitmap};
     use std;
 
@@ -240,7 +238,7 @@ mod test {
     fn empty() {
         let bm = Bitmap::new(10, 10).unwrap();
 
-        for i in range(0, 10) {
+        for i in 0..10 {
             assert_eq!(bm.get(i), Some(0));
         }
 
@@ -256,7 +254,7 @@ mod test {
             data: &mut data as *mut [u8; 4] as *mut u8
         };
 
-        for i in range(0, 8) {
+        for i in 0..8 {
             assert_eq!(bm.get(i), Some(i));
         }
 
@@ -272,7 +270,7 @@ mod test {
     fn set() {
         let mut bm = Bitmap::new(10, 3).unwrap();
 
-        for i in range(0, 8) {
+        for i in 0..8 {
             assert!(bm.set(i, i));
             assert_eq!(bm.get(i), Some(i));
         }
@@ -316,6 +314,35 @@ mod test {
         bm.set(7, 0b110);
 
         let bs: Vec<usize> = bm.iter().collect();
-        assert_eq!(bs.as_slice(), [0, 0, 0b101, 0, 0, 0, 0, 0b110, 0, 0].as_slice());
+        assert_eq!(bs, [0, 0, 0b101, 0, 0, 0, 0, 0b110, 0, 0]);
+    }
+
+    fn set_then_clear_prop(entries: usize, width: usize) -> bool {
+        if width >= std::mem::size_of::<usize>() * 8 || width == 0 { return true }
+        let mut bm = Bitmap::new(entries, width).unwrap();
+        let all_set = (1 << width) - 1;
+        for i in 0..entries {
+            assert!(bm.set(i, all_set));
+        }
+
+        for val in &bm {
+            println!("should be {}, is {}", all_set, val);
+            if val != all_set { return false; }
+        }
+
+        for i in 0..entries {
+            assert!(bm.set(i, 0));
+        }
+
+        for val in &bm {
+            println!("should be {}, is {}", 0, val);
+            if val != 0 { return false; }
+        }
+        true
+    }
+
+    #[test]
+    fn set_then_clear_is_identity() {
+        quickcheck(set_then_clear_prop as fn(usize, usize) -> bool);
     }
 }

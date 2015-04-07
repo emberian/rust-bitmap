@@ -3,7 +3,7 @@ env:
   global:
     - secure: j5NS820mY4CwAa6Lu9Pub9fM4XEbzQCVeQeFyvPSNrAjhVDXYZnnKGV0AjhtcLUbNWdWyz6vK6xptLdozbcEvabA5mXqERkkiwdm2AHzFsqoBHvuj1TemKjuCZZkXA3qsAZUqMBy03C85kIKPsPldDTqQ6IpSXRoFQkhvGeT/Ho=
 script:
-  - cargo build
+  - exit
   - cargo test
   - cargo doc
 after_script:

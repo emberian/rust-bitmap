@@ -12,7 +12,5 @@ less then the size of a uint.
 license
 -------
 
-``rust-bitmap`` is available under the same license as Rust (dual Apache2/MIT)
-
-.. _Documentation: http://rust-ci.org/cmr/rust-bitmap/doc/bitmap/
-.. _rust-ci: http://rust-ci.org/
+``rust-bitmap`` is available under the Boost Software License. This is roughly
+the same as the MIT license, but without requiring attribution.
