@@ -36,7 +36,7 @@ impl Bitmap {
             .and_then(|bits| bits.checked_add(8 - (bits % 8)))
             .and_then(|rbits| rbits.checked_div(8))
             .and_then(|needed| {
-                let ptr = unsafe {
+                let ptr = {
                     let mut alloc = Vec::<u8>::with_capacity(needed);
                     let ptr = alloc.as_mut_ptr();
                     std::mem::forget(alloc);
